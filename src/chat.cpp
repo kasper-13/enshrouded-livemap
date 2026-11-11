@@ -51,7 +51,7 @@ struct RecordedMessage {
     uint8_t type = 0;
 };
 
-Config g_config;
+ChatConfig g_config;
 ChatPostFn g_post_fn = nullptr;
 fault::Hook g_chat_post_hook;
 
@@ -243,7 +243,7 @@ void on_chat_post_hook(SafetyHookContext& ctx) {
 
 }  // namespace
 
-void init(const Config& config) {
+void init(const ChatConfig& config) {
     g_config = config;
     if (g_config.enabled && !g_config.webhook_url.empty() && !g_worker_running.load()) {
         g_worker_running.store(true);

@@ -7,14 +7,14 @@
 
 namespace livemap::chat {
 
-struct Config {
+struct ChatConfig {
     bool enabled = false;
     std::string webhook_url;
     std::string bot_name = "Enshrouded";
 };
 
 // Initializes the chat bridge with configuration.
-void init(const Config& config);
+void init(const ChatConfig& config);
 
 // Installs the chat_post hook if the site is available.
 bool install(const Targets& targets);

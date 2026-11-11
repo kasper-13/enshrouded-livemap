@@ -125,7 +125,17 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: cmake --build build
+        run: |
+          cmake --build build > build.log 2>&1
+          if errorlevel 1 (
+            type build.log
+            echo ### Build Failed >> "%GITHUB_STEP_SUMMARY%"
+            echo ``` >> "%GITHUB_STEP_SUMMARY%"
+            type build.log >> "%GITHUB_STEP_SUMMARY%"
+            echo ``` >> "%GITHUB_STEP_SUMMARY%"
+            exit /b 1
+          )
+          type build.log
 
       - name: Test
         shell: cmd
