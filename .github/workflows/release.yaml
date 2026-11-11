@@ -70,15 +70,10 @@ jobs:
         run: |
           set -euo pipefail
           notes="${RUNNER_TEMP}/release-notes.md"
-          cat > "$notes" <<EOF
-Automated build of this fork of oggii/enshrouded-livemap. The Enshrouded server builds this release supports are listed in https://github.com/${GH_REPO}/blob/${TAG}/README.md.
-
-Verify the download with \`sha256sum --check EnshroudedLiveMap-${VERSION}.zip.sha256\` or \`gh attestation verify EnshroudedLiveMap-${VERSION}.zip --repo ${GH_REPO} --signer-workflow ${GH_REPO}/.github/workflows/release.yaml --source-ref refs/tags/${TAG}\`.
-
-HD map users: use upstream's 1.7.0 HD map asset.
-
-\`${TOOL}\` is the Linux build of the compat tool that checks a new server build against the supported ones. Verify it with \`sha256sum --check ${TOOL}.sha256\` or \`gh attestation verify ${TOOL} --repo ${GH_REPO} --signer-workflow ${GH_REPO}/.github/workflows/release.yaml --source-ref refs/tags/${TAG}\`. The licenses of the code linked into it are in https://github.com/${GH_REPO}/blob/${TAG}/tools/compat/THIRD_PARTY_NOTICES.md.
-EOF
+          printf 'Automated build of this fork of oggii/enshrouded-livemap. The Enshrouded server builds this release supports are listed in https://github.com/%s/blob/%s/README.md.\n\n' "$GH_REPO" "$TAG" > "$notes"
+          printf 'Verify the download with `sha256sum --check EnshroudedLiveMap-%s.zip.sha256` or `gh attestation verify EnshroudedLiveMap-%s.zip --repo %s --signer-workflow %s/.github/workflows/release.yaml --source-ref refs/tags/%s`.\n\n' "$VERSION" "$VERSION" "$GH_REPO" "$GH_REPO" "$TAG" >> "$notes"
+          printf 'HD map users: use upstream'\''s 1.7.0 HD map asset.\n\n' >> "$notes"
+          printf '`%s` is the Linux build of the compat tool that checks a new server build against the supported ones. Verify it with `sha256sum --check %s.sha256` or `gh attestation verify %s --repo %s --signer-workflow %s/.github/workflows/release.yaml --source-ref refs/tags/%s`. The licenses of the code linked into it are in https://github.com/%s/blob/%s/tools/compat/THIRD_PARTY_NOTICES.md.\n' "$TOOL" "$TOOL" "$TOOL" "$GH_REPO" "$GH_REPO" "$TAG" "$GH_REPO" "$TAG" >> "$notes"
 
           prerelease_opt=()
           if [[ "$TAG" =~ -(alpha|beta|rc) ]]; then
