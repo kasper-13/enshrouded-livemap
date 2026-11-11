@@ -6,9 +6,11 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
+#include <initializer_list>
 #include <mutex>
 #include <span>
 #include <string>
