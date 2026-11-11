@@ -67,7 +67,13 @@ Config load_config(const std::wstring& dir) {
             "UpdateMs=250\n"
             "Log=1\n"
             "; 1 = log time and positions every 30 s (to check the mod reads the right values).\n"
-            "LogDiagnostics=1\n";
+            "LogDiagnostics=1\n\n"
+            "[discord]\n"
+            "; Discord Webhook URL to send in-game chat to Discord.\n"
+            "WebhookUrl=\n"
+            "; 1 = enable Discord webhook forwarding and /api/chat REST bridge.\n"
+            "EnableBridge=1\n"
+            "BotName=Enshrouded\n";
         if (FILE* f = _wfopen(path.c_str(), L"wb")) {
             std::fwrite(text.data(), 1, text.size(), f);
             std::fclose(f);
@@ -120,6 +126,12 @@ Config load_config(const std::wstring& dir) {
     c.bases = GetPrivateProfileIntW(L"livemap", L"Bases", 1, path.c_str()) != 0;
     c.discovered = GetPrivateProfileIntW(L"livemap", L"Discovered", 1, path.c_str()) != 0;
     c.chat_probe = GetPrivateProfileIntW(L"livemap", L"ChatProbe", 0, path.c_str()) != 0;
+    GetPrivateProfileStringW(L"discord", L"WebhookUrl", L"", buf, 512, path.c_str());
+    c.discord_webhook = narrow(buf);
+    GetPrivateProfileStringW(L"discord", L"BotName", L"Enshrouded", buf, 128, path.c_str());
+    c.discord_bot_name = narrow(buf);
+    int default_bridge = c.discord_webhook.empty() ? 1 : 1;
+    c.discord_bridge = GetPrivateProfileIntW(L"discord", L"EnableBridge", default_bridge, path.c_str()) != 0;
     return c;
 }
 

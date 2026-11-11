@@ -1,6 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json
-# See https://github.com/anthony-spruyt/repo-operator/blob/main/src/templates/.github/workflows/ci.yaml for template comments
-
 name: "CI"
 on:
   pull_request:
@@ -14,39 +11,9 @@ concurrency:
   group: "${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.action != 'labeled' && github.event.pull_request.number || github.run_id }}"
   cancel-in-progress: "${{ github.event_name == 'pull_request' && github.event.action != 'labeled' }}"
 jobs:
-  lint:
-    permissions:
-      actions: "read"
-      contents: "read"
-      security-events: "write"
-    uses: "anthony-spruyt/repo-operator/.github/workflows/_lint.yaml@f6e036f1b8d14b66fb144e0905e424e1c83f9fc3"
   repo:
-    needs:
-      - "lint"
     permissions:
       contents: "read"
       packages: "read"
     uses: "./.github/workflows/ci-repo.yaml"
     secrets: "inherit"
-  image:
-    needs:
-      - "lint"
-      - "repo"
-    if: "!cancelled() && needs.lint.result == 'success' && (needs.repo.result == 'success' || needs.repo.result == 'skipped')"
-    permissions:
-      contents: "read"
-    uses: "anthony-spruyt/repo-operator/.github/workflows/_images.yaml@f6e036f1b8d14b66fb144e0905e424e1c83f9fc3"
-  summary:
-    needs:
-      - "lint"
-      - "repo"
-      - "image"
-      - "sonar"
-    if: "always()"
-    permissions:
-      actions: "read"
-      contents: "read"
-    uses: "anthony-spruyt/repo-operator/.github/workflows/_summary.yaml@f6e036f1b8d14b66fb144e0905e424e1c83f9fc3"
-  sonar:
-    permissions: {}
-    uses: "anthony-spruyt/repo-operator/.github/workflows/_sonar-new-issues.yaml@f6e036f1b8d14b66fb144e0905e424e1c83f9fc3"

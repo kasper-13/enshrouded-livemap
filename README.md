@@ -164,6 +164,28 @@ used instead. `DetectPublicAddress=0` stops the IP lookup entirely.
 | `Discovered` | `1` | Which places each player discovered and where they have been (filter and fog of war). |
 | `Log`, `LogDiagnostics` | `1` | Log file and periodic diagnostics. |
 
+### Discord Chat Bridge (`[discord]` section)
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `WebhookUrl` | empty | Discord Webhook URL. When set, player chat in-game is forwarded to your Discord channel. |
+| `EnableBridge` | `1` | `1` enables the `/api/chat` REST endpoint and Discord webhook forwarder. |
+| `BotName` | `Enshrouded` | Username displayed by the Discord webhook. |
+
+#### REST Chat API
+
+- **Inbound (`POST /api/chat?key=<Key>`)**:
+  Broadcasts a message into the game server chat:
+  ```json
+  {
+    "sender": "DiscordUser",
+    "message": "Ready to take down the Fell Monstrosity?"
+  }
+  ```
+  Appears in-game as: `[DiscordUser] Ready to take down the Fell Monstrosity?`.
+- **Outbound (`GET /api/chat?key=<Key>`)**:
+  Returns the recent in-game chat messages as a JSON array.
+
 ## The log
 
 `livemap.log` is next to the server exe and is written while `Log` is `1`. Each line starts with a

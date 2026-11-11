@@ -50,4 +50,8 @@ void install_bases(const Targets& targets);
 // Research switch: after a player joins, post one chat line per message type 0..7.
 void enable_chat_probe(const Targets& targets);
 
+// Player lookups for chat & Discord bridge
+std::string player_name_by_handle(uint32_t handle);
+bool get_active_player(uint32_t& handle, uint64_t& account);
+
 }  // namespace livemap::world

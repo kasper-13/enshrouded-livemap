@@ -21,6 +21,9 @@ struct Config {
     bool bases = true;           // Flame Altars on the map (Bases=0 turns them off)
     bool discovered = true;      // which markers each player discovered (Discovered=0 turns it off)
     bool chat_probe = false;     // research: after a join, post one chat line per message type
+    bool discord_bridge = false; // REST chat bridge (/api/chat) and webhook integration
+    std::string discord_webhook; // WebhookUrl= to post player messages to Discord
+    std::string discord_bot_name = "Enshrouded";
 };
 
 // Reads livemap.ini from `dir`; writes it with the defaults (and a random key) if it is missing.

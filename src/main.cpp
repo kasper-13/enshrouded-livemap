@@ -20,6 +20,7 @@
 #include "web.h"
 #include "world.h"
 #include "announce.h"
+#include "chat.h"
 #include "link.h"
 #include "public_ip.h"
 
@@ -251,6 +252,14 @@ DWORD WINAPI start(LPVOID) {
     if (config.announce_in_chat) {
         const int port = config.port;
         livemap::install_announce(base, *targets.matched, [port] { return livemap::link::chat_line(current_link(), port); });
+    }
+    if (config.discord_bridge) {
+        livemap::chat::init({
+            .enabled = config.discord_bridge,
+            .webhook_url = config.discord_webhook,
+            .bot_name = config.discord_bot_name
+        });
+        livemap::chat::install(targets);
     }
     uint64_t last_diag = 0;
     for (;;) {

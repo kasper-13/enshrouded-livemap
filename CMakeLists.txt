@@ -42,6 +42,7 @@ add_library(iphlpapi SHARED
     src/world.cpp
     src/web.cpp
     src/announce.cpp
+    src/chat.cpp
     src/public_ip.cpp
     src/proxy.cpp
     src/proxy_stubs.asm

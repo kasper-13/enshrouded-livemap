@@ -12,6 +12,7 @@
 #include <string_view>
 #include <thread>
 
+#include "chat.h"
 #include "link.h"
 #include "log.h"
 #include "world.h"
@@ -188,10 +189,35 @@ void handle(SOCKET s) {
         }
         req.append(buf, n);
     }
+    size_t head_end = req.find("\r\n\r\n");
+    std::string body;
+    if (head_end != std::string::npos) {
+        body = req.substr(head_end + 4);
+    }
+    size_t cl_pos = req.find("Content-Length:");
+    if (cl_pos == std::string::npos) {
+        cl_pos = req.find("content-length:");
+    }
+    if (cl_pos != std::string::npos && cl_pos < head_end) {
+        size_t line_end = req.find("\r\n", cl_pos);
+        std::string cl_str = req.substr(cl_pos + 15, line_end - (cl_pos + 15));
+        size_t content_len = std::strtoul(cl_str.c_str(), nullptr, 10);
+        while (body.size() < content_len && body.size() < 65536) {
+            int n = recv(s, buf, sizeof buf, 0);
+            if (n <= 0) {
+                break;
+            }
+            body.append(buf, n);
+        }
+    }
     size_t sp1 = req.find(' ');
     size_t sp2 = sp1 == std::string::npos ? std::string::npos : req.find(' ', sp1 + 1);
-    if (sp2 == std::string::npos || req.compare(0, sp1, "GET") != 0) {
-        send_response(s, "405 Method Not Allowed", "text/plain", "GET only\n");
+    if (sp2 == std::string::npos) {
+        return;
+    }
+    std::string method = req.substr(0, sp1);
+    if (method != "GET" && method != "POST") {
+        send_response(s, "405 Method Not Allowed", "text/plain", "GET or POST only\n");
         return;
     }
     std::string target = req.substr(sp1 + 1, sp2 - sp1 - 1);
@@ -207,6 +233,28 @@ void handle(SOCKET s) {
     }
     if (g_config.key.empty() || !link::key_equal(query_param(query, "key"), g_config.key)) {
         send_response(s, "403 Forbidden", "text/plain", "Open the map with ?key=<Key from livemap.ini>\n");
+        return;
+    }
+    if (path == "/api/chat") {
+        if (method == "GET") {
+            send_response(s, "200 OK", "application/json", chat::recent_messages_json());
+            return;
+        }
+        if (method == "POST") {
+            std::string sender = "Discord";
+            std::string msg;
+            chat::parse_chat_payload(body, sender, msg);
+            if (msg.empty()) {
+                send_response(s, "400 Bad Request", "application/json", "{\"error\": \"empty message\"}\n");
+                return;
+            }
+            chat::queue_inbound(sender, msg);
+            send_response(s, "200 OK", "application/json", "{\"status\": \"queued\"}\n");
+            return;
+        }
+    }
+    if (method != "GET") {
+        send_response(s, "405 Method Not Allowed", "text/plain", "GET only\n");
         return;
     }
     if (path == "/state") {

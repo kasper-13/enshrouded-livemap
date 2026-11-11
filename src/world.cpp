@@ -16,6 +16,7 @@
 
 #include <safetyhook.hpp>
 
+#include "chat.h"
 #include "ecs.h"
 #include "fault_handler.h"
 #include "log.h"
@@ -192,6 +193,7 @@ void on_player_table(SafetyHookContext& ctx) {
     fault::SiteScope scope(kSitePlayerTable);
     g_manager.store(ctx.rcx, std::memory_order_relaxed);
     probe_step(ctx.rcx);
+    chat::on_tick(ctx.rcx);
 }
 
 // Every entity the movement system moves passes here; only players are kept.
@@ -916,6 +918,46 @@ void log_diagnostics() {
             meters(s.z.load(std::memory_order_relaxed)),
             GetTickCount64() - s.seen_ms.load());
     }
+}
+
+std::string player_name_by_handle(uint32_t handle) {
+    if (handle == 0) {
+        return {};
+    }
+    uintptr_t manager = g_manager.load(std::memory_order_relaxed);
+    if (manager == 0) {
+        return {};
+    }
+    for (int i = 0; i < kSlotCount; ++i) {
+        uintptr_t slot = manager + kSlots + static_cast<uintptr_t>(i) * kStride;
+        uint32_t h = 0;
+        if (read_u32(slot, h) && h == handle) {
+            std::lock_guard lock(g_names_mutex);
+            return g_names[i];
+        }
+    }
+    return {};
+}
+
+bool get_active_player(uint32_t& handle, uint64_t& account) {
+    uintptr_t manager = g_manager.load(std::memory_order_relaxed);
+    if (manager == 0) {
+        return false;
+    }
+    for (int i = 0; i < kSlotCount; ++i) {
+        uintptr_t slot = manager + kSlots + static_cast<uintptr_t>(i) * kStride;
+        uint32_t h = 0, entity = 0;
+        uint8_t state = 0;
+        if (read_u32(slot, h) && h != 0 && read_u8(slot + kState, state) && state == kInGame &&
+            read_u32(slot + kEntity, entity) && entity != 0) {
+            uint64_t acc = 0;
+            read_u64(slot + 0x48, acc);
+            handle = h;
+            account = acc;
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace livemap::world
