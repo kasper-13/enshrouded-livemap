@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <safetyhook.hpp>
 #include "scan.h"
 
 namespace livemap::chat {

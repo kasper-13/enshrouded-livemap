@@ -254,11 +254,11 @@ DWORD WINAPI start(LPVOID) {
         livemap::install_announce(base, *targets.matched, [port] { return livemap::link::chat_line(current_link(), port); });
     }
     if (config.discord_bridge) {
-        livemap::chat::init({
-            .enabled = config.discord_bridge,
-            .webhook_url = config.discord_webhook,
-            .bot_name = config.discord_bot_name
-        });
+        livemap::chat::Config chat_cfg;
+        chat_cfg.enabled = config.discord_bridge;
+        chat_cfg.webhook_url = config.discord_webhook;
+        chat_cfg.bot_name = config.discord_bot_name;
+        livemap::chat::init(chat_cfg);
         livemap::chat::install(targets);
     }
     uint64_t last_diag = 0;

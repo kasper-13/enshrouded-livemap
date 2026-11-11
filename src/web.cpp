@@ -5,8 +5,9 @@
 #include <windows.h>
 
 #include <atomic>
-#include <cstdio>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>

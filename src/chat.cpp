@@ -7,12 +7,16 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <deque>
 #include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
+
+#include <safetyhook.hpp>
 
 #include "fault_handler.h"
 #include "log.h"
@@ -32,7 +36,7 @@ constexpr const char* kSiteChatPost = "chat_post";
 struct InboundMessage {
     std::string sender;
     std::string text;
-    uint64_t queued_ms;
+    uint64_t queued_ms = 0;
 };
 
 struct OutboundMessage {
@@ -41,10 +45,10 @@ struct OutboundMessage {
 };
 
 struct RecordedMessage {
-    uint64_t timestamp;
+    uint64_t timestamp = 0;
     std::string sender;
     std::string text;
-    uint8_t type;
+    uint8_t type = 0;
 };
 
 Config g_config;
@@ -65,6 +69,15 @@ std::deque<RecordedMessage> g_recent_messages;
 constexpr size_t kMaxRecentMessages = 50;
 
 thread_local bool g_is_injected = false;
+
+std::wstring to_wide(std::string_view s) {
+    std::wstring out;
+    out.reserve(s.size());
+    for (char c : s) {
+        out += static_cast<wchar_t>(static_cast<unsigned char>(c));
+    }
+    return out;
+}
 
 std::string escape_json(std::string_view in) {
     std::string out;
@@ -94,12 +107,12 @@ std::string escape_json(std::string_view in) {
 
 void record_message(const std::string& sender, const std::string& text, uint8_t type) {
     std::lock_guard lock(g_recent_mutex);
-    g_recent_messages.push_back({
-        .timestamp = static_cast<uint64_t>(GetTickCount64()),
-        .sender = sender,
-        .text = text,
-        .type = type
-    });
+    RecordedMessage rec;
+    rec.timestamp = static_cast<uint64_t>(GetTickCount64());
+    rec.sender = sender;
+    rec.text = text;
+    rec.type = type;
+    g_recent_messages.push_back(std::move(rec));
     while (g_recent_messages.size() > kMaxRecentMessages) {
         g_recent_messages.pop_front();
     }
@@ -123,8 +136,8 @@ void send_discord_webhook(const std::string& webhook_url, const std::string& bot
     std::string host(url.substr(0, slash));
     std::string path(url.substr(slash));
 
-    std::wstring host_w(host.begin(), host.end());
-    std::wstring path_w(path.begin(), path.end());
+    std::wstring host_w = to_wide(host);
+    std::wstring path_w = to_wide(path);
 
     HINTERNET session = WinHttpOpen(L"EnshroudedLiveMap-Discord/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
@@ -195,7 +208,8 @@ void on_chat_post_hook(SafetyHookContext& ctx) {
         return;
     }
     std::string msg(static_cast<size_t>(str_len), '\0');
-    if (!read_bytes(str_ptr, std::as_writable_bytes(std::span(msg)))) {
+    auto byte_span = std::span<std::byte>(reinterpret_cast<std::byte*>(msg.data()), msg.size());
+    if (!read_bytes(str_ptr, byte_span)) {
         return;
     }
     msg = text::clean_utf8(msg);
@@ -218,7 +232,10 @@ void on_chat_post_hook(SafetyHookContext& ctx) {
     if (g_config.enabled && !g_config.webhook_url.empty()) {
         std::lock_guard lock(g_outbound_mutex);
         if (g_outbound_queue.size() < 100) {
-            g_outbound_queue.push_back({.sender = sender, .text = msg});
+            OutboundMessage out_msg;
+            out_msg.sender = sender;
+            out_msg.text = msg;
+            g_outbound_queue.push_back(std::move(out_msg));
             g_outbound_cv.notify_one();
         }
     }
@@ -266,11 +283,11 @@ void shutdown() {
 void queue_inbound(std::string sender, std::string message) {
     std::lock_guard lock(g_inbound_mutex);
     if (g_inbound_queue.size() < 100) {
-        g_inbound_queue.push_back({
-            .sender = std::move(sender),
-            .text = std::move(message),
-            .queued_ms = static_cast<uint64_t>(GetTickCount64())
-        });
+        InboundMessage in_msg;
+        in_msg.sender = std::move(sender);
+        in_msg.text = std::move(message);
+        in_msg.queued_ms = static_cast<uint64_t>(GetTickCount64());
+        g_inbound_queue.push_back(std::move(in_msg));
     }
 }
 
