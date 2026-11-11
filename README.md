@@ -1,4 +1,11 @@
 <!-- markdownlint-disable MD041 -->
+# Enshrouded LiveMap (Discord Bridge & Standalone CI/CD Fork)
+
+> **Attribution & Credits:**
+> - **Original Creator:** [oggii](https://github.com/oggii) ([oggii/enshrouded-livemap](https://github.com/oggii/enshrouded-livemap))
+> - **Community Maintainer:** [anthony-spruyt](https://github.com/anthony-spruyt) ([anthony-spruyt/enshrouded-livemap](https://github.com/anthony-spruyt/enshrouded-livemap))
+> - **Fork Features:** Discord chat bridge integration & automated standalone CI/CD workflows, developed with AI-assisted binary reverse engineering (Antigravity).
+
 ## About this fork
 
 This is a fork of [oggii/enshrouded-livemap](https://github.com/oggii/enshrouded-livemap).

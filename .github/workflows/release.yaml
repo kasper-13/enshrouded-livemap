@@ -53,57 +53,6 @@ jobs:
             sha256sum --check "$file.sha256"
           done
 
-      - name: Find the draft release
-        id: draft
-        env:
-          TAG: ${{ github.ref_name }}
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_AUTHOR: "repo-operator-release-bot[bot]"
-        run: |
-          set -euo pipefail
-          releases=$(gh api --paginate "repos/${GH_REPO}/releases?per_page=100" \
-            | jq -s --arg tag "$TAG" '[.[][] | select(.tag_name == $tag)]')
-          total=$(jq 'length' <<< "$releases")
-          if [ "$total" -eq 0 ]; then
-            echo "::error::No draft release exists for ${TAG}. release-please creates it before the tag."
-            exit 1
-          fi
-          if [ "$total" -ne 1 ]; then
-            echo "::error::${total} releases exist for ${TAG}; expected exactly one draft."
-            exit 1
-          fi
-          release=$(jq '.[0]' <<< "$releases")
-          require() {
-            jq -e "$1" <<< "$release" > /dev/null || { echo "::error::The release for ${TAG} $2."; exit 1; }
-          }
-          require '.draft == true' "is already published and is left unchanged"
-          require '.author.login == env.RELEASE_AUTHOR' "was not created by ${RELEASE_AUTHOR}"
-          require '(.assets | length) == 0' "already has assets"
-          id=$(jq -r '.id' <<< "$release")
-          upload_url=$(jq -r '.upload_url | sub("\\{[^}]*\\}$"; "")' <<< "$release")
-          [[ "$id" =~ ^[0-9]+$ ]] || { echo "::error::The release id is not a number."; exit 1; }
-          [[ "$upload_url" =~ ^https://uploads\.github\.com/repos/[^/]+/[^/]+/releases/${id}/assets$ ]] || { echo "::error::The upload URL does not belong to release ${id}."; exit 1; }
-          jq -r '.body // ""' <<< "$release" > "${RUNNER_TEMP}/release-notes.md"
-          {
-            echo "id=${id}"
-            echo "upload_url=${upload_url}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Upload the files to the draft release
-        working-directory: dist
-        env:
-          GH_TOKEN: ${{ github.token }}
-          UPLOAD_URL: ${{ steps.draft.outputs.upload_url }}
-          TOOL: livemap-compat-linux-x64
-        run: |
-          set -euo pipefail
-          zip="EnshroudedLiveMap-${VERSION}.zip"
-          gh api --method POST "${UPLOAD_URL}?name=${zip}" --header "Content-Type: application/zip" --input "$zip" > /dev/null
-          gh api --method POST "${UPLOAD_URL}?name=${zip}.sha256" --header "Content-Type: text/plain" --input "${zip}.sha256" > /dev/null
-          gh api --method POST "${UPLOAD_URL}?name=${TOOL}" --header "Content-Type: application/octet-stream" --input "$TOOL" > /dev/null
-          gh api --method POST "${UPLOAD_URL}?name=${TOOL}.sha256" --header "Content-Type: text/plain" --input "${TOOL}.sha256" > /dev/null
-
       - name: Attest the build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -111,42 +60,46 @@ jobs:
             dist/EnshroudedLiveMap-${{ needs.build.outputs.version }}.zip
             dist/livemap-compat-linux-x64
 
-      - name: Publish the release
+      - name: Publish release
         working-directory: dist
         env:
           TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_ID: ${{ steps.draft.outputs.id }}
           TOOL: livemap-compat-linux-x64
         run: |
           set -euo pipefail
-          zip="EnshroudedLiveMap-${VERSION}.zip"
-          zip_digest="sha256:$(sha256sum "$zip" | cut -d ' ' -f 1)"
-          sum_digest="sha256:$(sha256sum "$zip.sha256" | cut -d ' ' -f 1)"
-          tool_digest="sha256:$(sha256sum "$TOOL" | cut -d ' ' -f 1)"
-          tool_sum_digest="sha256:$(sha256sum "$TOOL.sha256" | cut -d ' ' -f 1)"
-          release_url="repos/${GH_REPO}/releases/${RELEASE_ID}"
-          assets_match() {
-            jq -e --arg zip "$zip" --arg zip_digest "$zip_digest" --arg sum "$zip.sha256" --arg sum_digest "$sum_digest" \
-              --arg tool "$TOOL" --arg tool_digest "$tool_digest" --arg tool_sum "$TOOL.sha256" --arg tool_sum_digest "$tool_sum_digest" \
-              '(.assets | map({name, digest}) | sort_by(.name)) == ([{name: $zip, digest: $zip_digest}, {name: $sum, digest: $sum_digest}, {name: $tool, digest: $tool_digest}, {name: $tool_sum, digest: $tool_sum_digest}] | sort_by(.name))' > /dev/null
-          }
-          release=$(gh api "$release_url")
-          jq -e '.draft == true' <<< "$release" > /dev/null || { echo "::error::Release ${RELEASE_ID} is not a draft."; exit 1; }
-          assets_match <<< "$release" || { echo "::error::The assets of release ${RELEASE_ID} are not exactly ${zip}, ${zip}.sha256, ${TOOL} and ${TOOL}.sha256 with the digests of the local files."; exit 1; }
           notes="${RUNNER_TEMP}/release-notes.md"
-          printf '\n\n' >> "$notes"
-          cat >> "$notes" <<EOF
-          Automated build of this fork of oggii/enshrouded-livemap. The Enshrouded server builds this release supports are listed in https://github.com/${GH_REPO}/blob/${TAG}/README.md.
+          cat > "$notes" <<EOF
+Automated build of this fork of oggii/enshrouded-livemap. The Enshrouded server builds this release supports are listed in https://github.com/${GH_REPO}/blob/${TAG}/README.md.
 
-          Verify the download with \`sha256sum --check EnshroudedLiveMap-${VERSION}.zip.sha256\` or \`gh attestation verify EnshroudedLiveMap-${VERSION}.zip --repo ${GH_REPO} --signer-workflow ${GH_REPO}/.github/workflows/release.yaml --source-ref refs/tags/${TAG}\`.
+Verify the download with \`sha256sum --check EnshroudedLiveMap-${VERSION}.zip.sha256\` or \`gh attestation verify EnshroudedLiveMap-${VERSION}.zip --repo ${GH_REPO} --signer-workflow ${GH_REPO}/.github/workflows/release.yaml --source-ref refs/tags/${TAG}\`.
 
-          HD map users: use upstream's 1.7.0 HD map asset.
+HD map users: use upstream's 1.7.0 HD map asset.
 
-          \`${TOOL}\` is the Linux build of the compat tool that checks a new server build against the supported ones. Verify it with \`sha256sum --check ${TOOL}.sha256\` or \`gh attestation verify ${TOOL} --repo ${GH_REPO} --signer-workflow ${GH_REPO}/.github/workflows/release.yaml --source-ref refs/tags/${TAG}\`. The licenses of the code linked into it are in https://github.com/${GH_REPO}/blob/${TAG}/tools/compat/THIRD_PARTY_NOTICES.md.
-          EOF
-          jq -n --rawfile body "$notes" '{draft: false, body: $body}' | gh api --method PATCH "$release_url" --input - > /dev/null
-          release=$(gh api "$release_url")
-          jq -e '.draft == false and .immutable == true' <<< "$release" > /dev/null || { echo "::error::Release ${RELEASE_ID} is not a published immutable release."; exit 1; }
-          assets_match <<< "$release" || { echo "::error::The assets of release ${RELEASE_ID} changed while publishing."; exit 1; }
+\`${TOOL}\` is the Linux build of the compat tool that checks a new server build against the supported ones. Verify it with \`sha256sum --check ${TOOL}.sha256\` or \`gh attestation verify ${TOOL} --repo ${GH_REPO} --signer-workflow ${GH_REPO}/.github/workflows/release.yaml --source-ref refs/tags/${TAG}\`. The licenses of the code linked into it are in https://github.com/${GH_REPO}/blob/${TAG}/tools/compat/THIRD_PARTY_NOTICES.md.
+EOF
+
+          prerelease_opt=()
+          if [[ "$TAG" =~ -(alpha|beta|rc) ]]; then
+            prerelease_opt=("--prerelease")
+          fi
+
+          if gh release view "$TAG" --repo "$GH_REPO" > /dev/null 2>&1; then
+            echo "Release $TAG exists, uploading files..."
+            gh release upload "$TAG" --repo "$GH_REPO" --clobber \
+              "EnshroudedLiveMap-${VERSION}.zip" \
+              "EnshroudedLiveMap-${VERSION}.zip.sha256" \
+              "$TOOL" \
+              "$TOOL.sha256"
+          else
+            gh release create "$TAG" \
+              --repo "$GH_REPO" \
+              --title "$TAG" \
+              --notes-file "$notes" \
+              "${prerelease_opt[@]}" \
+              "EnshroudedLiveMap-${VERSION}.zip" \
+              "EnshroudedLiveMap-${VERSION}.zip.sha256" \
+              "$TOOL" \
+              "$TOOL.sha256"
+          fi

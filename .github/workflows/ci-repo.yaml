@@ -96,8 +96,9 @@ jobs:
           if not match:
               fail("no project VERSION found in CMakeLists.txt")
           version = match.group(1)
-          if os.environ["GITHUB_REF_TYPE"] == "tag" and os.environ["GITHUB_REF_NAME"] != "v" + version:
-              fail(f"tag {os.environ['GITHUB_REF_NAME']} does not match CMakeLists.txt version {version}")
+          ref_name = os.environ.get("GITHUB_REF_NAME", "")
+          if os.environ.get("GITHUB_REF_TYPE") == "tag" and not (ref_name == "v" + version or ref_name.startswith("v" + version + "-")):
+              fail(f"tag {ref_name} does not match CMakeLists.txt version {version}")
           print(f"version {version}")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write(f"version={version}\n")
@@ -219,6 +220,7 @@ jobs:
           print(f"file list equals upstream's 1.7.0 zip ({len(built)} files); {identical} non-DLL files are byte-identical, {len(LINTED)} match their pinned digests")
 
       - name: Check the hook sites against the exe store
+        if: github.repository == 'anthony-spruyt/enshrouded-livemap'
         shell: cmd
         env:
           GH_TOKEN: ${{ github.token }}

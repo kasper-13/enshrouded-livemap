@@ -13,6 +13,7 @@ concurrency:
 permissions: {}
 jobs:
   release:
+    if: github.repository == 'anthony-spruyt/enshrouded-livemap'
     permissions:
       contents: "read"
     uses: "anthony-spruyt/repo-operator/.github/workflows/_release-please.yaml@f6e036f1b8d14b66fb144e0905e424e1c83f9fc3"
