@@ -125,7 +125,13 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: cmake --build build
+        run: |
+          cmake --build build > build.log 2>&1
+          set BUILD_EXIT=%ERRORLEVEL%
+          if %BUILD_EXIT% neq 0 (
+            python -c "import pathlib; lines = [l.strip() for l in pathlib.Path('build.log').read_text(errors='ignore').splitlines() if 'error' in l.lower() or 'fatal' in l.lower()][:25]; [print(f'::error::{l}') for l in lines]"
+            exit /b %BUILD_EXIT%
+          )
 
       - name: Test
         shell: cmd
