@@ -1,6 +1,6 @@
 #include "fault_handler.h"
 
-#include <Windows.h>
+#include <windows.h>
 
 #include <array>
 #include <atomic>

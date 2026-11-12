@@ -191,9 +191,9 @@ void handle(SOCKET s) {
         req.append(buf, n);
     }
     size_t head_end = req.find("\r\n\r\n");
-    std::string body;
+    std::string req_body;
     if (head_end != std::string::npos) {
-        body = req.substr(head_end + 4);
+        req_body = req.substr(head_end + 4);
     }
     size_t cl_pos = req.find("Content-Length:");
     if (cl_pos == std::string::npos) {
@@ -203,12 +203,12 @@ void handle(SOCKET s) {
         size_t line_end = req.find("\r\n", cl_pos);
         std::string cl_str = req.substr(cl_pos + 15, line_end - (cl_pos + 15));
         size_t content_len = std::strtoul(cl_str.c_str(), nullptr, 10);
-        while (body.size() < content_len && body.size() < 65536) {
+        while (req_body.size() < content_len && req_body.size() < 65536) {
             int n = recv(s, buf, sizeof buf, 0);
             if (n <= 0) {
                 break;
             }
-            body.append(buf, n);
+            req_body.append(buf, n);
         }
     }
     size_t sp1 = req.find(' ');
@@ -244,7 +244,7 @@ void handle(SOCKET s) {
         if (method == "POST") {
             std::string sender = "Discord";
             std::string msg;
-            chat::parse_chat_payload(body, sender, msg);
+            chat::parse_chat_payload(req_body, sender, msg);
             if (msg.empty()) {
                 send_response(s, "400 Bad Request", "application/json", "{\"error\": \"empty message\"}\n");
                 return;

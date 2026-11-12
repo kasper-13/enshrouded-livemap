@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <io.h>
+#include <share.h>
 
 #include <cstdarg>
 #include <cstdio>

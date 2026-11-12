@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(enshrouded_livemap VERSION 1.9.2 LANGUAGES CXX ASM_MASM) # x-release-please-version
+if(NOT MSVC)
+    set(CMAKE_ASM_MASM_FLAGS "-m64 ${CMAKE_ASM_MASM_FLAGS}")
+endif()
 if(MSVC AND MSVC_VERSION LESS 1950)
     message(FATAL_ERROR "livemap needs Visual Studio 2026 (MSVC 14.50) or newer; found MSVC ${MSVC_VERSION}")
 endif()
@@ -49,10 +52,18 @@ add_library(iphlpapi SHARED
     src/proxy.def
 )
 target_link_libraries(iphlpapi PRIVATE livemap_core safetyhook::safetyhook ws2_32 bcrypt winhttp)
+set_target_properties(iphlpapi PROPERTIES PREFIX "")
 target_compile_definitions(iphlpapi PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS
     LIVEMAP_VERSION="${PROJECT_VERSION}${LIVEMAP_LOCAL_SUFFIX}")
-target_compile_options(iphlpapi PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive->)
+if(MSVC)
+    target_compile_options(iphlpapi PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4 /permissive->)
+else()
+    target_compile_options(iphlpapi PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -fms-extensions>)
+    target_link_options(iphlpapi PRIVATE -static)
+endif()
 
+option(BUILD_TESTS "Build offline tests" ON)
+if(BUILD_TESTS)
 # Offline check against an enshrouded_server.exe on disk: would the DLL hook this build?
 add_executable(finds_test tests/finds_test.cpp)
 target_link_libraries(finds_test PRIVATE livemap_core)
@@ -117,11 +128,10 @@ add_test(NAME tools_compat_workflow COMMAND "${Python3_EXECUTABLE}" -B -m pytest
 add_library(fault_gate_mod SHARED tests/fault_gate_mod.cpp src/fault_handler.cpp src/log.cpp src/memory.cpp)
 target_link_libraries(fault_gate_mod PRIVATE livemap_core safetyhook::safetyhook)
 target_compile_definitions(fault_gate_mod PRIVATE FAULT_GATE_EXPORTS WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS)
-target_compile_options(fault_gate_mod PRIVATE /W4 /permissive-)
-add_executable(fault_gate tests/fault_gate.cpp)
-target_link_libraries(fault_gate PRIVATE fault_gate_mod)
-target_compile_definitions(fault_gate PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-target_compile_options(fault_gate PRIVATE /W4 /permissive-)
+if(MSVC)
+    target_compile_options(fault_gate_mod PRIVATE /W4 /permissive-)
+    target_compile_options(fault_gate PRIVATE /W4 /permissive-)
+endif()
 add_test(NAME fault_gate COMMAND "${Python3_EXECUTABLE}" -B -m pytest -q -p no:cacheprovider "${CMAKE_CURRENT_SOURCE_DIR}/tools/test_fault_gate.py")
 set_tests_properties(fault_gate PROPERTIES ENVIRONMENT "FAULT_GATE_EXE=$<TARGET_FILE:fault_gate>")
 
@@ -145,6 +155,7 @@ if(LIVEMAP_TEST_OLD_EXE AND LIVEMAP_TEST_NEW_EXE)
     else()
         add_test(NAME executable_guard_regressions COMMAND compat_test "${LIVEMAP_TEST_OLD_EXE}" "${LIVEMAP_TEST_NEW_EXE}")
     endif()
+endif()
 endif()
 
 add_subdirectory(tools/compat)
